@@ -1,0 +1,33 @@
+stages:
+  - lint
+  - test
+  - build
+  - upload
+
+lint:
+  tags: []
+  stage: lint
+  image: IMAGE_WITH_PYTHON37_AND_PIPENV
+  script: _CI/scripts/lint.py
+
+test:
+  tags: []
+  stage: test
+  image: IMAGE_WITH_PYTHON37_AND_PIPENV
+  script: _CI/scripts/test.py
+
+build:
+  tags: []
+  stage: build
+  image: IMAGE_WITH_PYTHON37_AND_PIPENV
+  script: _CI/scripts/build.py
+
+upload:
+  tags: []
+  stage: upload
+  image: IMAGE_WITH_PYTHON37_AND_PIPENV
+  only:
+    - tags
+  except:
+    - branches
+  script: _CI/scripts/upload.py
