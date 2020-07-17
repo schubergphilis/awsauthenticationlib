@@ -32,7 +32,7 @@ Import all parts from awsauthenticationlib here
    http://google.github.io/styleguide/pyguide.html
 """
 from ._version import __version__
-from awsauthenticationlib.awsauthenticationlib import LoggerMixin, AwsAuthenticator
+from awsauthenticationlib.awsauthenticationlib import LoggerMixin, AwsAuthenticator, Urls, Domains
 
 __author__ = '''Costas Tyfoxylos <ctyfoxylos@schubergphilis.com>'''
 __docformat__ = '''google'''
@@ -47,3 +47,5 @@ __status__ = '''Development'''  # "Prototype", "Development", "Production".
 assert __version__
 assert LoggerMixin
 assert AwsAuthenticator
+assert Urls
+assert Domains
