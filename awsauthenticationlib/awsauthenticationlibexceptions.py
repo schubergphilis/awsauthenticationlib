@@ -33,10 +33,14 @@ Custom exception code for awsauthenticationlib.
 
 __author__ = '''Costas Tyfoxylos <ctyfoxylos@schubergphilis.com>'''
 __docformat__ = '''google'''
-__date__ = '''18-05-2020'''
+__date__ = '''11-03-2020'''
 __copyright__ = '''Copyright 2020, Costas Tyfoxylos'''
 __credits__ = ["Costas Tyfoxylos"]
 __license__ = '''MIT'''
 __maintainer__ = '''Costas Tyfoxylos'''
 __email__ = '''<ctyfoxylos@schubergphilis.com>'''
 __status__ = '''Development'''  # "Prototype", "Development", "Production".
+
+
+class NoSigninTokenReceived(Exception):
+    """No Signing token was received."""
