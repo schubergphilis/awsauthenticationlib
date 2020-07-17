@@ -111,6 +111,16 @@ class Urls:
         """
         return f'{self.scheme}{self.region}.console.{self.root_domain}'
 
+    @property
+    def regional_single_sign_on(self):
+        """The url of the regional single sign on.
+
+        Returns:
+            regional_single_sign_on (str): The regional single sign on url.
+
+        """
+        return f'{self.scheme}{self.region}.console.{self.root_domain}/singlesignon'
+
 
 class LoggerMixin:  # pylint: disable=too-few-public-methods
     """Logger."""
