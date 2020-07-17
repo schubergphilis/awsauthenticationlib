@@ -112,11 +112,24 @@ class Urls:
         return f'{self.scheme}{self.region}.console.{self.root_domain}'
 
 
-class AwsAuthenticator:  # pylint: disable=too-many-instance-attributes
+class LoggerMixin:  # pylint: disable=too-few-public-methods
+    """Logger."""
+
+    @property
+    def logger(self):
+        """Exposes the logger to be used by objects using the Mixin.
+
+        Returns:
+            logger (logger): The properly named logger.
+
+        """
+        return logging.getLogger(f'{LOGGER_BASENAME}.{self.__class__.__name__}')
+
+
+class AwsAuthenticator(LoggerMixin):  # pylint: disable=too-many-instance-attributes
     """Interfaces with aws authentication mechanisms, providing pre signed urls, or authenticated sessions."""
 
     def __init__(self, arn):
-        self.logger = logging.getLogger(f'{LOGGER_BASENAME}.{self.__class__.__name__}')
         self.arn = arn
         self._session = requests.Session()
         self._sts_connection = boto3.client('sts')
