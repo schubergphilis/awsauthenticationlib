@@ -36,6 +36,7 @@ from awsauthenticationlib.awsauthenticationlib import (LoggerMixin,
                                                        AwsAuthenticator,
                                                        Urls,
                                                        Domains)
+from awsauthenticationlib.awsauthenticationlibexceptions import InvalidCredentials, NoSigninTokenReceived
 
 __author__ = '''Costas Tyfoxylos <ctyfoxylos@schubergphilis.com>'''
 __docformat__ = '''google'''
@@ -52,3 +53,6 @@ assert LoggerMixin
 assert AwsAuthenticator
 assert Urls
 assert Domains
+
+assert NoSigninTokenReceived
+assert InvalidCredentials

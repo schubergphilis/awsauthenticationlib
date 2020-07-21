@@ -44,3 +44,7 @@ __status__ = '''Development'''  # "Prototype", "Development", "Production".
 
 class NoSigninTokenReceived(Exception):
     """No Signing token was received."""
+
+
+class InvalidCredentials(Exception):
+    """No credentials or the credentials provided are not correct."""

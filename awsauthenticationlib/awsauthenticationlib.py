@@ -37,12 +37,13 @@ import urllib
 
 from dataclasses import dataclass
 
+import botocore
 import boto3
 import requests
 
 from bs4 import BeautifulSoup as Bfs
 
-from .awsauthenticationlibexceptions import NoSigninTokenReceived
+from .awsauthenticationlibexceptions import NoSigninTokenReceived, InvalidCredentials
 
 __author__ = '''Costas Tyfoxylos <ctyfoxylos@schubergphilis.com>'''
 __docformat__ = '''google'''
@@ -150,7 +151,12 @@ class AwsAuthenticator(LoggerMixin):  # pylint: disable=too-many-instance-attrib
 
     def _get_assumed_role(self, arn):
         self.logger.debug('Trying to assume role "%s".', arn)
-        return self._sts_connection.assume_role(RoleArn=arn, RoleSessionName="AssumeRoleSession")
+        try:
+            return self._sts_connection.assume_role(RoleArn=arn, RoleSessionName="AssumeRoleSession")
+        except botocore.exceptions.ParamValidationError as error:
+            raise ValueError('The arn you provided is incorrect: {}'.format(error)) from None
+        except (botocore.exceptions.NoCredentialsError, botocore.exceptions.ClientError) as error:
+            raise InvalidCredentials(error) from None
 
     @property
     def session_credentials(self):
