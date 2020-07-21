@@ -31,13 +31,12 @@ Import all parts from awsauthenticationlib here
 .. _Google Python Style Guide:
    http://google.github.io/styleguide/pyguide.html
 """
-from ._version import __version__
 from awsauthenticationlib.awsauthenticationlib import (LoggerMixin,
                                                        AwsAuthenticator,
                                                        Urls,
                                                        Domains)
-from ._version import __version__
 from awsauthenticationlib.awsauthenticationlibexceptions import InvalidCredentials, NoSigninTokenReceived
+from ._version import __version__
 
 __author__ = '''Costas Tyfoxylos <ctyfoxylos@schubergphilis.com>'''
 __docformat__ = '''google'''
