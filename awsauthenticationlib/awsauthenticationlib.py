@@ -137,7 +137,7 @@ class LoggerMixin:  # pylint: disable=too-few-public-methods
         return logging.getLogger(f'{LOGGER_BASENAME}.{self.__class__.__name__}')
 
 
-class AwsAuthenticator(LoggerMixin):  # pylint: disable=too-many-instance-attributes
+class AwsAuthenticator(LoggerMixin):
     """Interfaces with aws authentication mechanisms, providing pre signed urls, or authenticated sessions."""
 
     def __init__(self, arn):

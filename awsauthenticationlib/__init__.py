@@ -36,6 +36,7 @@ from awsauthenticationlib.awsauthenticationlib import (LoggerMixin,
                                                        AwsAuthenticator,
                                                        Urls,
                                                        Domains)
+from ._version import __version__
 from awsauthenticationlib.awsauthenticationlibexceptions import InvalidCredentials, NoSigninTokenReceived
 
 __author__ = '''Costas Tyfoxylos <ctyfoxylos@schubergphilis.com>'''
