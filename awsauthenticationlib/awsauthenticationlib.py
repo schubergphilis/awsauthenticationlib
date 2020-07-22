@@ -122,6 +122,16 @@ class Urls:
         """
         return f'{self.scheme}{self.region}.console.{self.root_domain}/singlesignon'
 
+    @property
+    def relay_state(self):
+        """The relay state url.
+
+        Returns:
+            relay_state (str): The relay state url.
+
+        """
+        return f'{self.regional_console}home?region={self.region}#'
+
 
 class LoggerMixin:  # pylint: disable=too-few-public-methods
     """Logger."""
