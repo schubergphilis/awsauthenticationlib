@@ -208,6 +208,13 @@ class AwsAuthenticator(LoggerMixin):
                   # 'SessionDuration': str(duration),
                   'Session': json.dumps(self.session_credentials)}
         response = requests.get(self.urls.federation, params=params)
+        if all([response.status_code == 401, response.text == 'Token Expired']):
+            try:
+                self._assumed_role = self._get_assumed_role(self.arn)
+                return self._get_signin_token()
+            except InvalidCredentials:
+                self.logger.error('The credentials on the environment do not provide access for session refresh.')
+                raise
         if response.ok:
             return response.json().get('SigninToken')
         raise NoSigninTokenReceived(response.status_code, response.text)
