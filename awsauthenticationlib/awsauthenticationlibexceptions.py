@@ -48,3 +48,7 @@ class NoSigninTokenReceived(Exception):
 
 class InvalidCredentials(Exception):
     """No credentials or the credentials provided are not correct."""
+
+
+class ExpiredCredentials(Exception):
+    """Credentials used to assume the role has expired."""

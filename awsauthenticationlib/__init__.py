@@ -35,7 +35,9 @@ from awsauthenticationlib.awsauthenticationlib import (LoggerMixin,
                                                        AwsAuthenticator,
                                                        Urls,
                                                        Domains)
-from awsauthenticationlib.awsauthenticationlibexceptions import InvalidCredentials, NoSigninTokenReceived
+from awsauthenticationlib.awsauthenticationlibexceptions import (InvalidCredentials,
+                                                                 NoSigninTokenReceived,
+                                                                 ExpiredCredentials)
 from ._version import __version__
 
 __author__ = '''Costas Tyfoxylos <ctyfoxylos@schubergphilis.com>'''
@@ -56,3 +58,4 @@ assert Domains
 
 assert NoSigninTokenReceived
 assert InvalidCredentials
+assert ExpiredCredentials
