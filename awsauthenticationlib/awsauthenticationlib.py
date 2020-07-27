@@ -43,7 +43,7 @@ import requests
 
 from bs4 import BeautifulSoup as Bfs
 
-from .awsauthenticationlibexceptions import NoSigninTokenReceived, InvalidCredentials
+from .awsauthenticationlibexceptions import NoSigninTokenReceived, InvalidCredentials, ExpiredCredentials
 
 __author__ = '''Costas Tyfoxylos <ctyfoxylos@schubergphilis.com>'''
 __docformat__ = '''google'''
@@ -59,6 +59,9 @@ __status__ = '''Development'''  # "Prototype", "Development", "Production".
 LOGGER_BASENAME = '''awsauthenticationlib'''
 LOGGER = logging.getLogger(LOGGER_BASENAME)
 LOGGER.addHandler(logging.NullHandler())
+
+
+SESSION_DURATION = 3600
 
 
 @dataclass
@@ -147,11 +150,12 @@ class LoggerMixin:  # pylint: disable=too-few-public-methods
         return logging.getLogger(f'{LOGGER_BASENAME}.{self.__class__.__name__}')
 
 
-class AwsAuthenticator(LoggerMixin):
+class AwsAuthenticator(LoggerMixin):   # pylint: disable=too-many-instance-attributes
     """Interfaces with aws authentication mechanisms, providing pre signed urls, or authenticated sessions."""
 
-    def __init__(self, arn):
+    def __init__(self, arn, session_duration=None):
         self.arn = arn
+        self.session_duration = session_duration if session_duration else SESSION_DURATION
         self._session = requests.Session()
         self._sts_connection = boto3.client('sts')
         self.region = self._sts_connection._client_config.region_name
@@ -162,7 +166,9 @@ class AwsAuthenticator(LoggerMixin):
     def _get_assumed_role(self, arn):
         self.logger.debug('Trying to assume role "%s".', arn)
         try:
-            return self._sts_connection.assume_role(RoleArn=arn, RoleSessionName="AssumeRoleSession")
+            return self._sts_connection.assume_role(RoleArn=arn,
+                                                    RoleSessionName="AssumeRoleSession",
+                                                    DurationSeconds=self.session_duration)
         except botocore.exceptions.ParamValidationError as error:
             raise ValueError('The arn you provided is incorrect: {}'.format(error)) from None
         except (botocore.exceptions.NoCredentialsError, botocore.exceptions.ClientError) as error:
@@ -292,7 +298,16 @@ class AwsAuthenticator(LoggerMixin):
         self.logger.debug('Getting url :%s', url)
         response = requests.get(**arguments)
         if not response.ok:
-            raise ValueError('Response received: %s' % response.text)
+            try:
+                error_response = Bfs(response.text, features='html.parser')
+                error_title = error_response.title.string.strip()
+                err_msg = error_response.find('div', {'id': 'content'}).find('p').string
+            except AttributeError:
+                raise ValueError('Response received: %s' % response.text)
+            if all([response.status_code == 400, error_title == 'Credentials expired']):
+                raise ExpiredCredentials(response.status_code, err_msg)
+            else:
+                raise ValueError('Response received: %s' % response.text)
         self._session.cookies.update(response.cookies)
         return response
 
@@ -333,8 +348,11 @@ class AwsAuthenticator(LoggerMixin):
         """
         self._get_response(self.get_signed_url(self.arn))
         dashboard = self._authenticate(url, domain=service)
-        soup = Bfs(dashboard.text, features="html.parser")
-        csrf_token = soup.find('meta', {'name': "awsc-csrf-token"}).attrs.get('content')
+        soup = Bfs(dashboard.text, features='html.parser')
+        try:
+            csrf_token = soup.find('meta', {'name': 'awsc-csrf-token'}).attrs.get('content')
+        except AttributeError:
+            raise ValueError('Response received: %s' % dashboard.text)
         session = requests.Session()
         cookies_to_filter = self._standard_cookies + [('JSESSIONID', self.domains.regional_console),
                                                       ('aws-creds', f'{self.domains.regional_console}/{service}'),
