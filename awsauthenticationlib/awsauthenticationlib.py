@@ -211,7 +211,7 @@ class AwsAuthenticator(LoggerMixin):   # pylint: disable=too-many-instance-attri
     def _get_signin_token(self):
         self.logger.debug('Trying to get signin token.')
         params = {'Action': 'getSigninToken',
-                  # 'SessionDuration': str(900),
+                  # 'SessionDuration': str(duration),
                   'Session': json.dumps(self.session_credentials)}
         response = requests.get(self.urls.federation, params=params)
         if all([response.status_code == 401, response.text == 'Token Expired']):
@@ -298,10 +298,11 @@ class AwsAuthenticator(LoggerMixin):   # pylint: disable=too-many-instance-attri
         self.logger.debug('Getting url :%s', url)
         response = requests.get(**arguments)
         if not response.ok:
+            error_response = Bfs(response.text, features="html.parser")
             if all([response.status_code == 400,  # pylint: disable= no-else-raise
-                    Bfs(response.text, features="html.parser").title.string == '\nCredentials expired']):
+                    error_response.title.string == '\nCredentials expired']):
                 self.logger.error('The credentials on the environment have expired.')
-                err_msg = Bfs(response.text, features="html.parser").find('div', {'id': "content"}).find('p').string
+                err_msg = error_response.find('div', {'id': "content"}).find('p').string
                 raise ExpiredCredentials(response.status_code, err_msg)
             else:
                 raise ValueError('Response received: %s' % response.text)
