@@ -349,7 +349,10 @@ class AwsAuthenticator(LoggerMixin):   # pylint: disable=too-many-instance-attri
         self._get_response(self.get_signed_url(self.arn))
         dashboard = self._authenticate(url, domain=service)
         soup = Bfs(dashboard.text, features="html.parser")
-        csrf_token = soup.find('meta', {'name': "awsc-csrf-token"}).attrs.get('content')
+        try:
+            csrf_token = soup.find('meta', {'name': "awsc-csrf-token"}).attrs.get('content')
+        except AttributeError:
+            raise ValueError('Response received: %s' % dashboard.text)
         session = requests.Session()
         cookies_to_filter = self._standard_cookies + [('JSESSIONID', self.domains.regional_console),
                                                       ('aws-creds', f'{self.domains.regional_console}/{service}'),
