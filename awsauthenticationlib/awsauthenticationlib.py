@@ -298,11 +298,13 @@ class AwsAuthenticator(LoggerMixin):   # pylint: disable=too-many-instance-attri
         self.logger.debug('Getting url :%s', url)
         response = requests.get(**arguments)
         if not response.ok:
-            error_response = Bfs(response.text, features="html.parser")
-            if all([response.status_code == 400,  # pylint: disable= no-else-raise
-                    error_response.title.string == '\nCredentials expired']):
-                self.logger.error('The credentials on the environment have expired.')
-                err_msg = error_response.find('div', {'id': "content"}).find('p').string
+            try:
+                error_response = Bfs(response.text, features='html.parser')
+                error_title = error_response.title.string.strip()
+                err_msg = error_response.find('div', {'id': 'content'}).find('p').string
+            except AttributeError:
+                raise ValueError('Response received: %s' % response.text)
+            if all([response.status_code == 400, error_title == 'Credentials expired']):
                 raise ExpiredCredentials(response.status_code, err_msg)
             else:
                 raise ValueError('Response received: %s' % response.text)
