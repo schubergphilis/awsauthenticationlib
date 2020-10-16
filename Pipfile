@@ -23,6 +23,6 @@ toml = "~=0.10.0"
 
 [packages]
 
-boto3 = "~=1.12.18"
-requests = "~=2.23.0"
-beautifulsoup4 = "~=4.8.1"
+boto3 = "~=1.15.17"
+requests = "~=2.24.0"
+beautifulsoup4 = "~=4.9.3"
