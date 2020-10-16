@@ -19,3 +19,9 @@ History
 ------------------
 
 * Better Exception Handling added
+
+
+0.0.3 (16-10-2020)
+------------------
+
+* Bumped dependencies
