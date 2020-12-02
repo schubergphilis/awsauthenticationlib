@@ -25,3 +25,9 @@ History
 ------------------
 
 * Bumped dependencies
+
+
+0.1.0 (02-12-2020)
+------------------
+
+* bumped requests 
