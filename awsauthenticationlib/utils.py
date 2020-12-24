@@ -32,6 +32,7 @@ Main code for utils.
 """
 
 import json
+import logging
 
 __author__ = '''Costas Tyfoxylos <ctyfoxylos@schubergphilis.com>'''
 __docformat__ = '''google'''
@@ -50,6 +51,7 @@ LOGGER.addHandler(logging.NullHandler())
 
 
 class HarParser:
+    """Parses a provided har file."""
 
     def __init__(self, har_file):
         self.data = self._parse(har_file)
@@ -93,6 +95,7 @@ class HarParser:
 
         Returns:
             text (str): Returns a text of the communication of a valid login to control tower.
+
         """
         return self._get_text_from_calls(self._get_service_calls('controltower'))
 
@@ -101,6 +104,7 @@ class HarParser:
 
         Returns:
             text (str): Returns a text of the communication of a valid login to single sign on.
+
         """
         return self._get_text_from_calls(self._get_service_calls('singlesignon'))
 
@@ -118,5 +122,6 @@ class HarParser:
 
         Returns:
             None
+
         """
         print(self.get_communication_for_sso())
