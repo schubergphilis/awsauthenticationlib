@@ -31,3 +31,9 @@ History
 ------------------
 
 * bumped requests 
+
+
+0.2.0 (06-01-2021)
+------------------
+
+* Implemented control tower authentication session.
