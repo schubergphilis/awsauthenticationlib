@@ -38,5 +38,29 @@ To use awsauthenticationlib in a project:
 
 .. code-block:: python
 
-    from awsauthenticationlib import Awsauthenticationlib
-    awsauthenticationlib = Awsauthenticationlib()
+    from awsauthenticationlib import AwsAuthenticator
+    awsauth = AwsAuthenticator('arn:aws:iam::ACCOUNTID:role/SomeRoleWithAdminRights')
+
+
+    awsauth.get_signed_url()
+    >>> 'https://signin.aws.amazon.com/federation?Action=login&Issuer=Example.com&Destination=https%3A%2F%2Fconsole.aws.amazon.com&SigninToken=real_long_valid_token_here'
+
+
+    awsauth.get_control_tower_authenticated_session()
+    >>> <requests.sessions.Session object at 0xaddress>
+
+
+    awsauth.get_sso_authenticated_session()
+    >>> <requests.sessions.Session object at 0xaddress>
+
+
+    awsauth=AwsAuthenticator('arn:aws:iam::ACCOUNTID:role/NoRightsOrWrongRole')
+    >>> awsauthenticationlib.awsauthenticationlibexceptions.InvalidCredentials: An error occurred (AccessDenied) when calling the AssumeRole operation: User: arn:aws:sts::ACCOUNTID:assumed-role/AWSReservedSSO_AWSAdministratorAccess_abcdefghij1234/someone@domain.com is not authorized to perform: sts:AssumeRole on resource: arn:aws:iam::ACCOUNTID:role/NoRightsOrWrongRole
+
+
+    awsauth.assumed_role_credentials
+    >>> {'aws_access_key_id': 'VALIDACCESSKEY', 'aws_secret_access_key': 'VALIDSECRETKEY', 'aws_session_token': 'VALIDSESSIONTOKEN'}
+
+
+    awsauth.session_credentials
+    >>> {'sessionId': 'VALIDSESSIONID', 'sessionKey': 'VALIDSESSIONKET', 'sessionToken': 'VALIDSESSIONTOKEN'}
