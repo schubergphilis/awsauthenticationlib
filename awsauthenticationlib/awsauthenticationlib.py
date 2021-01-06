@@ -30,15 +30,15 @@ Main code for awsauthenticationlib.
    http://google.github.io/styleguide/pyguide.html
 
 """
-
 import json
 import logging
 import urllib
 
+from copy import deepcopy
 from dataclasses import dataclass
 
-import botocore
 import boto3
+import botocore
 import requests
 
 from bs4 import BeautifulSoup as Bfs
@@ -60,16 +60,15 @@ LOGGER_BASENAME = '''awsauthenticationlib'''
 LOGGER = logging.getLogger(LOGGER_BASENAME)
 LOGGER.addHandler(logging.NullHandler())
 
-
-SESSION_DURATION = 3600
+DEFAULT_REGION = 'eu-west-1'
 
 
 @dataclass
-class CookieFilter:
-    """Object modeling a cookie for litering."""
+class FilterCookie:
+    """Object modeling a cookie for filtering."""
 
     name: str
-    domain: str = None
+    domain: str = ''
     exact_match: bool = False
 
 
@@ -153,15 +152,19 @@ class LoggerMixin:  # pylint: disable=too-few-public-methods
 class AwsAuthenticator(LoggerMixin):   # pylint: disable=too-many-instance-attributes
     """Interfaces with aws authentication mechanisms, providing pre signed urls, or authenticated sessions."""
 
-    def __init__(self, arn, session_duration=None):
+    def __init__(self, arn, session_duration=3600):
         self.arn = arn
-        self.session_duration = session_duration if session_duration else SESSION_DURATION
+        self.session_duration = session_duration
         self._session = requests.Session()
         self._sts_connection = boto3.client('sts')
-        self.region = self._sts_connection._client_config.region_name
+        self.region = self._get_region()
         self._assumed_role = self._get_assumed_role(arn)
         self.urls = Urls(self.region)
         self.domains = Domains(self.region)
+
+    def _get_region(self):
+        region = self._sts_connection._client_config.region_name  # pylint: disable=protected-access
+        return region if not region == 'aws-global' else DEFAULT_REGION
 
     def _get_assumed_role(self, arn):
         self.logger.debug('Trying to assume role "%s".', arn)
@@ -208,7 +211,7 @@ class AwsAuthenticator(LoggerMixin):   # pylint: disable=too-many-instance-attri
                     for key, value in payload.items()}
         return payload_
 
-    def _get_signin_token(self):
+    def _get_signin_token(self):  # we can pass a duration here.
         self.logger.debug('Trying to get signin token.')
         params = {'Action': 'getSigninToken',
                   # 'SessionDuration': str(duration),
@@ -243,7 +246,6 @@ class AwsAuthenticator(LoggerMixin):   # pylint: disable=too-many-instance-attri
 
     @staticmethod
     def _filter_cookies(cookies, filters=None):
-        filters = [CookieFilter(*filter_) for filter_ in filters]
         result_cookies = []
         for filter_ in filters:
             for cookie in cookies:
@@ -267,26 +269,27 @@ class AwsAuthenticator(LoggerMixin):   # pylint: disable=too-many-instance-attri
 
     @property
     def _default_headers(self):
-        return {'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-                'Accept-Encoding': 'gzip, deflate, br',
-                'Accept-Language': 'en-US,en;q=0.5',
-                'Connection': 'keep-alive',
-                'Upgrade-Insecure-Requests': '1',
-                'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.14; rv:73.0) '
-                              'Gecko/20100101 Firefox/73.0'}
+        return deepcopy({'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+                         'Accept-Encoding': 'gzip, deflate, br',
+                         'Accept-Language': 'en-US,en;q=0.5',
+                         'Connection': 'keep-alive',
+                         'Upgrade-Insecure-Requests': '1',
+                         'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.14; rv:73.0) '
+                                       'Gecko/20100101 Firefox/73.0'})
 
     @property
     def _standard_cookies(self):
-        return [('aws-account-data',),
-                ('aws-ubid-main',),
-                ('aws-userInfo',),
-                ('awsc-actm',),
-                ('awsm-vid',)]
+        return [FilterCookie('aws-account-data'),
+                FilterCookie('aws-ubid-main'),
+                FilterCookie('aws-userInfo'),
+                FilterCookie('awsc-actm'),
+                FilterCookie('awsm-vid')]
 
-    def _get_response(self, url, extra_cookies=None, params=None):
+    def _get_response(self, url, params=None, extra_cookies=None, headers=None):
         extra_cookies = extra_cookies or []
+        headers = headers or {}
         cookies_to_filter = self._standard_cookies + extra_cookies
-        headers = self._default_headers
+        headers.update(self._default_headers)
         cookies = self._filter_cookies(self._session.cookies, cookies_to_filter)
         headers['Cookie'] = self._header_cookie_from_cookies(cookies)
         arguments = {'url': url,
@@ -295,7 +298,7 @@ class AwsAuthenticator(LoggerMixin):   # pylint: disable=too-many-instance-attri
                      'allow_redirects': False}
         if params:
             arguments.update({'params': params})
-        self.logger.debug('Getting url :%s', url)
+        self.logger.debug('Getting url :%s with arguments : %s', url, arguments)
         response = requests.get(**arguments)
         if not response.ok:
             try:
@@ -306,27 +309,83 @@ class AwsAuthenticator(LoggerMixin):   # pylint: disable=too-many-instance-attri
                 raise ValueError('Response received: %s' % response.text)
             if all([response.status_code == 400, error_title == 'Credentials expired']):
                 raise ExpiredCredentials(response.status_code, err_msg)
-            else:
-                raise ValueError('Response received: %s' % response.text)
+            raise ValueError('Response received: %s' % response.text)
+        self._debug_response(response, cookies)
         self._session.cookies.update(response.cookies)
         return response
 
-    def _authenticate(self, url, domain=None):
+    @staticmethod
+    def _query_to_params(query):
+        query_lines = query.split('&') if query else []
+        return {line.split('=')[0]: line.split('=')[1] for line in query_lines}
+
+    def _debug_response(self, response, cookies):
+        params = self._query_to_params(urllib.parse.urlparse(response.request.url)[4])
+        self.logger.debug('URL : %s', response.request.url)
+        if params:
+            self.logger.debug('Params : ')
+            for key, value in params.items():
+                self.logger.debug('\t%s : %s', key, value)
+        self.logger.debug('Response status : %s', response.status_code)
+        self.logger.debug('\tRequest Headers :')
+        for name, value in dict(sorted(response.request.headers.items(), key=lambda x: x[0].lower())).items():
+            self.logger.debug('\t\t%s : %s', name, value)
+        self.logger.debug('\tRequest Cookies :')
+        for cookie in sorted(cookies, key=lambda x: x.name.lower()):
+            self.logger.debug('\t\t%s (domain:%s) : %s', cookie.name, cookie.domain, cookie.value)
+        self.logger.debug('\tResponse Headers :')
+        for name, value in dict(sorted(response.headers.items(), key=lambda x: x[0].lower())).items():
+            self.logger.debug('\t\t%s : %s', name, value)
+        self.logger.debug('\tResponse Cookies :')
+        for name, value in dict(sorted(response.cookies.items(), key=lambda x: x[0].lower())).items():
+            self.logger.debug('\t\t%s : %s', name, value)
+        self.logger.debug('Session Cookies :')
+        for cookie in sorted(self._session.cookies, key=lambda x: x.name.lower()):
+            self.logger.debug('\t%s (domain:%s%s) : %s', cookie.name, cookie.domain, cookie.path, cookie.value)
+
+    def get_control_tower_authenticated_session(self):
+        """Authenticates to control tower and returns an authenticated session.
+
+        Returns:
+            session (requests.Session): An authenticated session with headers and cookies set.
+
+        """
+        service = 'controltower'
+        self._session.get(self.get_signed_url())
+        url = f'{self.urls.regional_console}/{service}/home'
         host = urllib.parse.urlparse(url)[1]
-        filter_host = host if not domain else f'/{domain}'
-        self._get_response(url, extra_cookies=[('JSESSIONID', filter_host), ('seance', filter_host)])
+        self.logger.debug('Setting host to: %s', host)
+        self._get_response(url,
+                           params={'region': self.region},
+                           extra_cookies=[FilterCookie('JSESSIONID'),
+                                          FilterCookie('aws-userInfo-signed')])
         hash_args = self._get_response(url,
-                                       extra_cookies=[('JSESSIONID', filter_host), ('seance', filter_host)],
-                                       params={'state': 'hashArgs'})
-        url = hash_args.headers.get('Location')
-        oauth = self._get_response(url, extra_cookies=[('aws-creds', self.domains.sign_in)])
-        url = oauth.headers.get('Location')
-        oauth_challenge = self._get_response(url, extra_cookies=[('JSESSIONID', host, True), ('seance', host, True)])
-        url = oauth_challenge.headers.get('Location')
-        response = self._get_response(url, extra_cookies=[('aws-creds', filter_host),
-                                                          ('JSESSIONID', host),
-                                                          ('seance', host)])
-        return response
+                                       params={'state': 'hashArgs#'},
+                                       extra_cookies=[FilterCookie('JSESSIONID', self.urls.regional_console),
+                                                      FilterCookie('aws-userInfo-signed',),
+                                                      FilterCookie('aws-creds-code-verifier', self.urls.regional_console
+                                                                   )])
+        oauth = self._get_response(hash_args.headers.get('Location'),
+                                   extra_cookies=[FilterCookie('JSESSIONID', self.urls.regional_console),
+                                                  FilterCookie('aws-creds', self.domains.sign_in),
+                                                  FilterCookie('aws-userInfo-signed', ),
+                                                  FilterCookie('aws-creds-code-verifier', f'/{service}')],)
+        oauth_challenge = self._get_response(oauth.headers.get('Location'),
+                                             extra_cookies=[FilterCookie('JSESSIONID', self.urls.regional_console),
+                                                            FilterCookie('aws-userInfo-signed',),
+                                                            FilterCookie('aws-creds', self.domains.sign_in),
+                                                            FilterCookie('aws-creds-code-verifier', f'/{service}')])
+        self._get_response(oauth_challenge.headers.get('Location'),
+                           extra_cookies=[FilterCookie('aws-creds', f'/{service}'),
+                                          FilterCookie('JSESSIONID', host),
+                                          FilterCookie('aws-userInfo-signed')])
+        dashboard = self._get_response(url,
+                                       params={'region': self.region},
+                                       extra_cookies=[FilterCookie('aws-creds', f'/{service}'),
+                                                      FilterCookie('JSESSIONID', host),
+                                                      FilterCookie('aws-consoleInfo'),
+                                                      FilterCookie('aws-userInfo-signed')])
+        return self._get_session_from_console(dashboard, service)
 
     def get_sso_authenticated_session(self):
         """Authenticates to Single Sign On and returns an authenticated session.
@@ -337,31 +396,35 @@ class AwsAuthenticator(LoggerMixin):   # pylint: disable=too-many-instance-attri
         """
         service = 'singlesignon'
         url = f'{self.urls.regional_console}/{service}/home?region={self.region}#/dashboard'
-        return self._get_authenticated_session(service, url)
+        self._get_response(self.get_signed_url())
+        host = urllib.parse.urlparse(url)[1]
+        self._get_response(url, extra_cookies=[FilterCookie('JSESSIONID', f'/{service}')])
+        hash_args = self._get_response(url,
+                                       params={'state': 'hashArgs'},
+                                       extra_cookies=[FilterCookie('JSESSIONID', f'/{service}')])
+        oauth = self._get_response(hash_args.headers.get('Location'),
+                                   extra_cookies=[FilterCookie('aws-creds', self.domains.sign_in)])
+        oauth_challenge = self._get_response(oauth.headers.get('Location'),
+                                             extra_cookies=[FilterCookie('JSESSIONID', host, True)])
+        dashboard = self._get_response(oauth_challenge.headers.get('Location'),
+                                       extra_cookies=[FilterCookie('aws-creds', f'/{service}'),
+                                                      FilterCookie('JSESSIONID', host)])
+        return self._get_session_from_console(dashboard, service)
 
-    def _get_authenticated_session(self, service, url):
-        """Authenticates to an AWS service and returns an authenticated session.
-
-        Returns:
-            session (requests.Session): An authenticated session with headers and cookies set.
-
-        """
-        self._get_response(self.get_signed_url(self.arn))
-        dashboard = self._authenticate(url, domain=service)
-        soup = Bfs(dashboard.text, features='html.parser')
+    def _get_session_from_console(self, console_page_response, service):
+        soup = Bfs(console_page_response.text, features='html.parser')
         try:
             csrf_token = soup.find('meta', {'name': 'awsc-csrf-token'}).attrs.get('content')
         except AttributeError:
-            raise ValueError('Response received: %s' % dashboard.text)
+            raise ValueError('Response received: %s' % console_page_response.text)
         session = requests.Session()
-        cookies_to_filter = self._standard_cookies + [('JSESSIONID', self.domains.regional_console),
-                                                      ('aws-creds', f'{self.domains.regional_console}/{service}'),
-                                                      ('seance', self.domains.regional_console)]
-        headers = self._default_headers
+        cookies_to_filter = self._standard_cookies + [FilterCookie('JSESSIONID', self.domains.regional_console),
+                                                      FilterCookie('aws-creds',
+                                                                   f'{self.domains.regional_console}/{service}')]
         cookies = self._filter_cookies(self._session.cookies, cookies_to_filter)
-        headers['Cookie'] = self._header_cookie_from_cookies(cookies)
-        headers['X-CSRF-TOKEN'] = csrf_token
-        session.headers.update(headers)
+        session.headers.update(self._default_headers)
+        session.headers.update({'Cookie': self._header_cookie_from_cookies(cookies),
+                                'X-CSRF-TOKEN': csrf_token})
         for cookie in cookies:
             session.cookies.set_cookie(cookie)
         return session
