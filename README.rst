@@ -65,4 +65,6 @@ Instead use the provided build and upload scripts that create all the necessary 
 Project Features
 ================
 
-* TODO
+* Provides pre signed urls to the aws console
+* Provides valid python requests session object for SSO
+* Provides valid python requests session object for Control Tower

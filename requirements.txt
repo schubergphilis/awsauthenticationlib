@@ -7,6 +7,6 @@
 #
 # Please use Pipfile to update the requirements.
 #
-boto3~=1.15.18
-requests~=2.25.0
-beautifulsoup4~=4.9.3
+boto3>=1.16.49
+requests>=2.25.1
+beautifulsoup4>=4.9.3
