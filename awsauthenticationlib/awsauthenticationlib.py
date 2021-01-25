@@ -398,14 +398,20 @@ class AwsAuthenticator(LoggerMixin):   # pylint: disable=too-many-instance-attri
         url = f'{self.urls.regional_console}/{service}/home?region={self.region}#/dashboard'
         self._get_response(self.get_signed_url())
         host = urllib.parse.urlparse(url)[1]
+        self.logger.debug('Setting host to: %s', host)
         self._get_response(url, extra_cookies=[FilterCookie('JSESSIONID', f'/{service}')])
         hash_args = self._get_response(url,
-                                       params={'state': 'hashArgs'},
-                                       extra_cookies=[FilterCookie('JSESSIONID', f'/{service}')])
+                                       params={'state': 'hashArgs#'},
+                                       extra_cookies=[FilterCookie('JSESSIONID', f'/{service}'),
+                                                      FilterCookie('aws-userInfo-signed', )])
         oauth = self._get_response(hash_args.headers.get('Location'),
-                                   extra_cookies=[FilterCookie('aws-creds', self.domains.sign_in)])
+                                   extra_cookies=[FilterCookie('aws-creds', self.domains.sign_in),
+                                                  FilterCookie('aws-userInfo-signed', )])
         oauth_challenge = self._get_response(oauth.headers.get('Location'),
-                                             extra_cookies=[FilterCookie('JSESSIONID', host, True)])
+                                             extra_cookies=[FilterCookie('JSESSIONID', self.urls.regional_console),
+                                                            FilterCookie('aws-userInfo-signed', ),
+                                                            FilterCookie('aws-creds-code-verifier', f'/{service}')
+                                                            ])
         dashboard = self._get_response(oauth_challenge.headers.get('Location'),
                                        extra_cookies=[FilterCookie('aws-creds', f'/{service}'),
                                                       FilterCookie('JSESSIONID', host)])
