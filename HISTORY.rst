@@ -37,3 +37,9 @@ History
 ------------------
 
 * Implemented control tower authentication session.
+
+
+0.3.0 (25-01-2021)
+------------------
+
+* Fixed aws sso session generation issue
