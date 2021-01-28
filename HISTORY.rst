@@ -43,3 +43,9 @@ History
 ------------------
 
 * Fixed aws sso session generation issue
+
+
+0.4.0 (28-01-2021)
+------------------
+
+* Implemented explicit region setting.
