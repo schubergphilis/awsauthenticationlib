@@ -152,12 +152,12 @@ class LoggerMixin:  # pylint: disable=too-few-public-methods
 class AwsAuthenticator(LoggerMixin):   # pylint: disable=too-many-instance-attributes
     """Interfaces with aws authentication mechanisms, providing pre signed urls, or authenticated sessions."""
 
-    def __init__(self, arn, session_duration=3600):
+    def __init__(self, arn, session_duration=3600, region=None):
         self.arn = arn
         self.session_duration = session_duration
         self._session = requests.Session()
-        self._sts_connection = boto3.client('sts')
-        self.region = self._get_region()
+        self._sts_connection = boto3.client('sts', region_name=region)
+        self.region = region or self._get_region()
         self._assumed_role = self._get_assumed_role(arn)
         self.urls = Urls(self.region)
         self.domains = Domains(self.region)
