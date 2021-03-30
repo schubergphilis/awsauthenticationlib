@@ -108,6 +108,15 @@ class HarParser:
         """
         return self._get_text_from_calls(self._get_service_calls('singlesignon'))
 
+    def get_communication_for_billing(self):
+        """Returns a text of the communication of a valid login to billing.
+
+        Returns:
+            text (str): Returns a text of the communication of a valid login to billing.
+
+        """
+        return self._get_text_from_calls(self._get_service_calls('billing'))
+
     def render_communication_for_control_tower(self):
         """Prints a text of the communication of a valid login to control tower.
 
@@ -125,3 +134,12 @@ class HarParser:
 
         """
         print(self.get_communication_for_sso())
+
+    def render_communication_for_billing(self):
+        """Prints a text of the communication of a valid login to billing.
+
+        Returns:
+            None
+
+        """
+        print(self.get_communication_for_billing())
