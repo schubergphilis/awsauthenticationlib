@@ -73,6 +73,16 @@ class FilterCookie:
 
 
 @dataclass
+class CsrfTokenData:
+    """Object modeling the data required for csrf token filtering."""
+
+    entity_type: str
+    attributes: dict
+    attribute_value: str
+    headers_name: str
+
+
+@dataclass
 class Domains:
     """Dataclass holding the domains required for authenticating."""
 
@@ -385,7 +395,10 @@ class AwsAuthenticator(LoggerMixin):   # pylint: disable=too-many-instance-attri
                                                       FilterCookie('JSESSIONID', host),
                                                       FilterCookie('aws-consoleInfo'),
                                                       FilterCookie('aws-userInfo-signed')])
-        return self._get_session_from_console(dashboard, service)
+        csrf_token_data = CsrfTokenData('meta', {'name': 'awsc-csrf-token'}, 'content', 'X-CSRF-TOKEN')
+        extra_cookies = [FilterCookie('JSESSIONID', self.domains.regional_console),
+                         FilterCookie('aws-creds', f'{self.domains.regional_console}/{service}')]
+        return self._get_session_from_console(dashboard, csrf_token_data, extra_cookies)
 
     def get_sso_authenticated_session(self):
         """Authenticates to Single Sign On and returns an authenticated session.
@@ -415,22 +428,58 @@ class AwsAuthenticator(LoggerMixin):   # pylint: disable=too-many-instance-attri
         dashboard = self._get_response(oauth_challenge.headers.get('Location'),
                                        extra_cookies=[FilterCookie('aws-creds', f'/{service}'),
                                                       FilterCookie('JSESSIONID', host)])
-        return self._get_session_from_console(dashboard, service)
+        csrf_token_data = CsrfTokenData('meta', {'name': 'awsc-csrf-token'}, 'content', 'X-CSRF-TOKEN')
+        extra_cookies = [FilterCookie('JSESSIONID', self.domains.regional_console),
+                         FilterCookie('aws-creds', f'{self.domains.regional_console}/{service}')]
+        return self._get_session_from_console(dashboard, csrf_token_data, extra_cookies)
 
-    def _get_session_from_console(self, console_page_response, service):
+    def get_billing_authenticated_session(self):
+        """Authenticates to billing and returns an authenticated session.
+
+        Returns:
+            session (requests.Session): An authenticated session with headers and cookies set.
+
+        """
+        service = 'billing'
+        url = f'{self.urls.console}/{service}/home?region={self.region}'
+        self._get_response(self.get_signed_url())
+        host = urllib.parse.urlparse(url)[1]
+        self.logger.debug('Setting host to: %s', host)
+        self._get_response(url, extra_cookies=[FilterCookie('JSESSIONID', f'/{service}'),
+                                               FilterCookie('aws-userInfo-signed', )])
+        hash_args = self._get_response(url,
+                                       params={'state': 'hashArgs#'},
+                                       extra_cookies=[FilterCookie('JSESSIONID', f'/{service}'),
+                                                      FilterCookie('aws-userInfo-signed', ),
+                                                      FilterCookie('aws-creds-code-verifier', f'/{service}')])
+        oauth = self._get_response(hash_args.headers.get('Location'),
+                                   extra_cookies=[FilterCookie('aws-creds', self.domains.sign_in),
+                                                  FilterCookie('aws-userInfo-signed', )])
+        oauth_challenge = self._get_response(oauth.headers.get('Location'),
+                                             extra_cookies=[FilterCookie('JSESSIONID', self.urls.regional_console),
+                                                            FilterCookie('aws-userInfo-signed', ),
+                                                            FilterCookie('aws-creds-code-verifier', f'/{service}')
+                                                            ])
+        dashboard = self._get_response(oauth_challenge.headers.get('Location'),
+                                       extra_cookies=[FilterCookie('aws-creds', f'/{service}'),
+                                                      FilterCookie('JSESSIONID', host)])
+        csrf_token_data = CsrfTokenData('input', {'id': 'xsrfToken'}, 'value', 'x-awsbc-xsrf-token')
+        extra_cookies = [FilterCookie('aws-creds', '/billing')]
+        return self._get_session_from_console(dashboard, csrf_token_data, extra_cookies)
+
+    def _get_session_from_console(self, console_page_response, csrf_token_data, extra_cookies=None):
         soup = Bfs(console_page_response.text, features='html.parser')
         try:
-            csrf_token = soup.find('meta', {'name': 'awsc-csrf-token'}).attrs.get('content')
+            csrf_token = soup.find(csrf_token_data.entity_type,
+                                   csrf_token_data.attributes).attrs.get(csrf_token_data.attribute_value)
         except AttributeError:
             raise ValueError('Response received: %s' % console_page_response.text)
         session = requests.Session()
-        cookies_to_filter = self._standard_cookies + [FilterCookie('JSESSIONID', self.domains.regional_console),
-                                                      FilterCookie('aws-creds',
-                                                                   f'{self.domains.regional_console}/{service}')]
+        cookies_to_filter = self._standard_cookies + extra_cookies if extra_cookies else []
         cookies = self._filter_cookies(self._session.cookies, cookies_to_filter)
         session.headers.update(self._default_headers)
         session.headers.update({'Cookie': self._header_cookie_from_cookies(cookies),
-                                'X-CSRF-TOKEN': csrf_token})
+                                csrf_token_data.headers_name: csrf_token})
         for cookie in cookies:
             session.cookies.set_cookie(cookie)
         return session
