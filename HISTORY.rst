@@ -49,3 +49,9 @@ History
 ------------------
 
 * Implemented explicit region setting.
+
+
+0.5.0 (01-04-2021)
+------------------
+
+* Implemented billing session retrieval.
