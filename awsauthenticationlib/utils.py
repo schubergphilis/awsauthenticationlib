@@ -90,6 +90,15 @@ class HarParser:
                 text += f'\t\t{cookie["name"]} : {cookie["value"]}\n'
         return text
 
+    def get_communication_for_console(self):
+        """Returns a text of the communication of a valid login to console.
+
+        Returns:
+            text (str): Returns a text of the communication of a valid login to console.
+
+        """
+        return self._get_text_from_calls(self._get_service_calls('console'))
+
     def get_communication_for_control_tower(self):
         """Returns a text of the communication of a valid login to control tower.
 
@@ -116,6 +125,15 @@ class HarParser:
 
         """
         return self._get_text_from_calls(self._get_service_calls('billing'))
+
+    def render_communication_for_console(self):
+        """Prints a text of the communication of a valid login to console.
+
+        Returns:
+            None
+
+        """
+        print(self.get_communication_for_console())
 
     def render_communication_for_control_tower(self):
         """Prints a text of the communication of a valid login to control tower.

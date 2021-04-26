@@ -4,9 +4,13 @@ awsauthenticationlib
 
 A library providing pre signed urls and valid sessions for some aws services that still do not present an api.
 
-
 * Documentation: https://awsauthenticationlib.readthedocs.org/en/latest
 
+
+DEPRECATION WARNING
+===================
+
+This library is now part https://github.com/schubergphilis/awsapilib and thus all development on this repo will stop.
 
 Development Workflow
 ====================
